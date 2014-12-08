@@ -1,13 +1,16 @@
-""" This program scans activity on selected GPIO pins of RaspberryPi. The acitivity is processed and program select and play back concrete song from defined folder. Also it sends signal to selcted GPIO pins that send signal to light dimmers. This program is written for interactive instalation Taktovka placed in Musem of Bedrich Smetana in Prague. This program is supposed to run on RaspberryPi model B+ extended by custom made PCBs.
+""" This program scans activity on selected GPIO pins of RaspberryPi.
+The acitivity is processed and program select and play back concrete
+song from defined folder. Also it sends signal to selcted GPIO pins
+that send signal to light dimmers. This program is written for interactive
+instalation Taktovka placed in Musem of Bedrich Smetana in Prague.
+This program is supposed to run on RaspberryPi model B+ extended by
+custom made PCBs.
 
 Author: Bastlit
 """
 import os
-import random
+import random """ just for testing purpouses """
 import time
-
-#from os import listdir
-#from os.path import isfile, join
 
 """"""""""""""""""""""" folder reading and sorting """""""""""""""""""""""
 
@@ -20,7 +23,7 @@ absolutePath = '/home/ubu/bastlit/bedrich-smetana-taktovka/raspi_codes/bst_sound
 
 audioFiles = [f for f in os.listdir(absolutePath) if os.path.isfile(os.path.join(absolutePath,f))]
 audioFiles = sortListLenAlphabet(audioFiles)
-""" list of files in defined folder """
+""" final sorted list of files in defined folder """
 
 
 """ debugging print """
@@ -31,8 +34,11 @@ print audioFiles
 
 time.sleep(1)
 
-""""""""""""""""""""""" GPIO pins definition """""""""""""""""""""""
 
+
+
+""""""""""""""""""""""" GPIO pins definition """""""""""""""""""""""
+""" order of pins selected according to PCB layout """
 """ 12 input pins """
 inPin1 = 14
 inPin2 = 15
@@ -60,9 +66,10 @@ outPin10 = 27
 
 
 
-""""""""""""""""""""""" PIN LISTS MAPS AND SORTING FUNCTIONS """""""""""""""""""""""
+""""""""""""""""""""""" PIN LISTS & MAPS & SORTING FUNCTIONS """""""""""""""""""""""
 def sortKeysLenAlphabet(l):
     return sorted(sorted(l.keys()), key=len)
+
 
 inPinList = [inPin1, inPin2, inPin3,
              inPin4, inPin5, inPin6,
@@ -70,12 +77,13 @@ inPinList = [inPin1, inPin2, inPin3,
              inPin10, inPin11, inPin12
 ]
 
-#dictionary of in pins ids and its values
-inPinValues = {'inPin1':1, 'inPin2':0, 'inPin3':0,
+
+inPinValues = {'inPin1':0, 'inPin2':0, 'inPin3':0,
                'inPin4':0, 'inPin5':0, 'inPin6':0,
                'inPin7':0, 'inPin8':0, 'inPin9':0,
                'inPin10':0, 'inPin11':0, 'inPin12':0
 }
+
 
 outPinList = [outPin1, outPin2, outPin3,
               outPin4, outPin5, outPin6,
@@ -83,12 +91,14 @@ outPinList = [outPin1, outPin2, outPin3,
               outPin10
 ]
 
-#dictionary of out pins ids and its values
+
 outPinValues = {'outPin1':0, 'outPin2':0, 'outPin3':0,
                 'outPin4':0, 'outPin5':0, 'outPin6':0,
                 'outPin7':0, 'outPin8':0, 'outPin9':0,
                 'outPin10':0
 }
+
+
 
 """"""""""""""""""""""" APP VARS AND LOGIC HLEPERS """""""""""""""""""""""
 """ helper selected vars  """
@@ -99,6 +109,9 @@ selectedSong = ""
 """ general program states"""
 programStates = ["reading", "playing", "dimmingOut", "closing"]
 programState = "reading"
+
+
+
 
 """"""""""""""""""""""" GENERAL FUNCTIONS """""""""""""""""""""""
 def pickSong (x):
@@ -133,6 +146,7 @@ def whichSong (vals):
         n = -1
     return n
 
+
 def changeSelectedSong(x, inDict):
     n = 0
     keys = sortKeysLenAlphabet(inDict)
@@ -142,6 +156,8 @@ def changeSelectedSong(x, inDict):
         else:
             inDict[k]=0
         n=n+1
+
+
 
 
 """"""""""""""""""""""" MAIN LOOP """""""""""""""""""""""
@@ -156,10 +172,6 @@ while programState!="closing":
         programState = "playing"
 
     if programState == "playing":
-
-        """ print "will pick song number: " + str(whichSong(inPinKeys))
-        pickSong(random.randrange(len(audioFiles)))"""
-
         pickSong(whichSong(inPinValues))
         time.sleep(1)
         programState = "dimmingOut"
@@ -169,5 +181,6 @@ while programState!="closing":
         programState="reading"
 
 
-#print "zaviram aplikaci\n"
+
+print "zaviram aplikaci\n"
 exit()
