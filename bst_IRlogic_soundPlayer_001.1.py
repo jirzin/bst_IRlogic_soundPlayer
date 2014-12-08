@@ -1,32 +1,39 @@
-""" This program scans activity on selected GPIO pins of RaspberryPi.
-The acitivity is processed and program select and play back concrete
-song from defined folder. Also it sends signal to selcted GPIO pins
-that send signal to light dimmers. This program is written for interactive
-instalation Taktovka placed in Musem of Bedrich Smetana in Prague.
-This program is supposed to run on RaspberryPi model B+ extended by
-custom made PCBs.
+# This program scans activity on selected GPIO pins of RaspberryPi.
+# The acitivity is processed and program select and play back concrete
+# song from defined folder. Also it sends signal to selcted GPIO pins
+# that send signal to light dimmers. This program is written for interactive
+# instalation Taktovka placed in Musem of Bedrich Smetana in Prague.
+# This program is supposed to run on RaspberryPi model B+ extended by
+# custom made PCBs.
 
-Author: Bastlit
-"""
+# Author: Bastlit
+
 import os
-import random """ just for testing purpouses """
+import random #""" just for testing purpouses """
 import time
+import RPi.GPIO as GPIO
 
-""""""""""""""""""""""" folder reading and sorting """""""""""""""""""""""
+
+# debugging print
+print "\nGPIO version: " +GPIO.VERSION
+time.sleep(1)
+#exit()
+
+#""""""""""""""""""""""" folder reading and sorting """""""""""""""""""""""
 
 def sortListLenAlphabet(l):
     return sorted(sorted(l, key=len))
 
-path = "bst_soundFolder/"
-""" path variable stores path to folder containing tracks to be played """
-absolutePath = '/home/ubu/bastlit/bedrich-smetana-taktovka/raspi_codes/bst_soundFolder/'
+path = "/home/pi/bst_sounds/"
+#""" path to folder containing tracks to be played """
+absolutePath = '/home/pi/bst_sounds/'
 
 audioFiles = [f for f in os.listdir(absolutePath) if os.path.isfile(os.path.join(absolutePath,f))]
 audioFiles = sortListLenAlphabet(audioFiles)
-""" final sorted list of files in defined folder """
+#""" final sorted list of files in defined folder """
 
 
-""" debugging print """
+#""" debugging print """
 print "\nfolder to be read"
 print path
 print "\nfiles to be played"
@@ -36,10 +43,14 @@ time.sleep(1)
 
 
 
+#""""""""""""""""""""""" GPIO and pins definition """""""""""""""""""""""
+# GPIO general setup
+GPIO.setmode(GPIO.BCM)
 
-""""""""""""""""""""""" GPIO pins definition """""""""""""""""""""""
-""" order of pins selected according to PCB layout """
-""" 12 input pins """
+#""" order of pins selected according to PCB layout """
+#""" 12 input pins """
+
+# GPIO pin numbering for RaspberryPi B+
 inPin1 = 14
 inPin2 = 15
 inPin3 = 18
@@ -52,7 +63,8 @@ inPin9 = 12
 inPin10 = 16
 inPin11 = 20
 inPin12 = 21
-""" 10 output pins """
+
+#""" 10 output pins """
 outPin1 = 26
 outPin2 = 19
 outPin3 = 13
@@ -65,8 +77,8 @@ outPin9 = 22
 outPin10 = 27
 
 
-
-""""""""""""""""""""""" PIN LISTS & MAPS & SORTING FUNCTIONS """""""""""""""""""""""
+ 
+#""""""""""""""""""""""" PIN LISTS & MAPS & SORTING FUNCTIONS """""""""""""""""""""""
 def sortKeysLenAlphabet(l):
     return sorted(sorted(l.keys()), key=len)
 
@@ -98,41 +110,88 @@ outPinValues = {'outPin1':0, 'outPin2':0, 'outPin3':0,
                 'outPin10':0
 }
 
+#""""""""""""""""""""""" ACCUMULATION OF ACTIVE PINS """"""""""""""""""""""
+inPinAccum = {'inPin1':0, 'inPin2':0, 'inPin3':0,
+              'inPin4':0, 'inPin5':0, 'inPin6':0,
+              'inPin7':0, 'inPin8':0, 'inPin9':0,
+              'inPin10':0, 'inPin11':0, 'inPin12':0
+}
+
+accumMax = 255 # basically a time value needed for detector to be acceped focused one
+readPeriod = 0.04
 
 
-""""""""""""""""""""""" APP VARS AND LOGIC HLEPERS """""""""""""""""""""""
-""" helper selected vars  """
+#""""""""""""""""""""""" APP VARS AND LOGIC HLEPERS """""""""""""""""""""""
+#""" helper selected vars  """
 selectedInput = 0
 selectedOutput = 0
 selectedSong = ""
 
-""" general program states"""
+#""" general program states"""
 programStates = ["reading", "playing", "dimmingOut", "closing"]
 programState = "reading"
 
 
-
-
-""""""""""""""""""""""" GENERAL FUNCTIONS """""""""""""""""""""""
+#""""""""""""""""""""""" GENERAL FUNCTIONS """""""""""""""""""""""
 def pickSong (x):
     if x >= 0:
         song = audioFiles[x]
         print "\nplay file: " + song + '\n'
         time.sleep(0.5)
-        os.system('mplayer ' + absolutePath + song)
+        os.system('aplay ' + absolutePath + song)
         print "\nend of song\n"
 
     if x == -1:
         print "\nno track is selected\n"
 
 
-
+# just stupid debugging function
 def readInPinValues(inDict):
     n = 0
     keys = sortKeysLenAlphabet(inDict)
     for k in keys:
         print "id: " + str(k) + " value: " + str(inDict[k])
 
+
+def clamp(x,minim,maxim):
+    if x < minim:
+        return minim
+    elif x > maxim:
+        return maxim
+    else:
+        return x
+
+
+def accumInPinValues(inDict,accumDict):
+    print '\n'
+
+    keys = sortKeysLenAlphabet(inDict)
+    for k in keys:
+        ad = accumDict[k]
+        if inDict[k] == 1:
+            ad = clamp(ad+1,0,255)
+        elif inDict[k] == 0:
+            ad = clamp(ad-1,0,255)
+        # write accumulation to dictionary
+        accumDict[k] = ad
+        print "id: " + str(k) + " accum: " + str(accumDict[k])
+
+
+def orderOfFocused(accumDict):
+    n = 0
+    keys = sortKeysLenAlphabet(accumDict)    
+    for k in keys:
+        ad = accumDict[k]
+        # if one of detectors reach maximum value
+        # return its order number
+        # otherwise returns -1
+        if ad == 255:
+            return n        
+        else:
+            return -1
+        # rise the order number
+        n=n+1
+    
 
 def whichSong (vals):
     n = 0
@@ -159,17 +218,19 @@ def changeSelectedSong(x, inDict):
 
 
 
-
-""""""""""""""""""""""" MAIN LOOP """""""""""""""""""""""
+#""""""""""""""""""""""" MAIN LOOP """""""""""""""""""""""
 
 while programState!="closing":
 
     if programState == "reading":
-        changeSelectedSong(input("new song number: "),inPinValues)
-        print '\n'
-        readInPinValues(inPinValues)
-        time.sleep(0.5)
-        programState = "playing"
+        #changeSelectedSong(input("new song number: "),inPinValues)        
+        while programState == "reading":
+            #print '\n'
+            #readInPinValues(inPinValues)
+            accumInPinValues(inPinValues,inPinAccum)
+            print "\n focused stand order: " + str(orderOfFocused(inPinAccum))
+            time.sleep(readPeriod)
+            #programState = "playing"
 
     if programState == "playing":
         pickSong(whichSong(inPinValues))
