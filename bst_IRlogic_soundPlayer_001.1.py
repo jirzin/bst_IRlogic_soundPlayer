@@ -9,7 +9,7 @@
 # Author: Bastlit
 
 import os
-import random #""" just for testing purpouses """
+import random # just for testing purpouses
 import time
 import RPi.GPIO as GPIO
 
@@ -19,36 +19,32 @@ print "\nGPIO version: " +GPIO.VERSION
 time.sleep(1)
 #exit()
 
-#""""""""""""""""""""""" folder reading and sorting """""""""""""""""""""""
+# folder reading and sorting
 
 def sortListLenAlphabet(l):
     return sorted(sorted(l, key=len))
 
+
+
 path = "/home/pi/bst_sounds/"
-#""" path to folder containing tracks to be played """
+# path to folder containing tracks to be played
 absolutePath = '/home/pi/bst_sounds/'
 
 audioFiles = [f for f in os.listdir(absolutePath) if os.path.isfile(os.path.join(absolutePath,f))]
-audioFiles = sortListLenAlphabet(audioFiles)
-#""" final sorted list of files in defined folder """
+audioFiles = sorted(sorted(audioFiles),key=len)
+# final sorted list of files in defined folder
 
-
-#""" debugging print """
-#print "\nfolder to be read"
-#print path
-#print "\nfiles to be played"
 #print audioFiles
+#exit()
 
-time.sleep(1)
-
-#""""""""""""""""""""""" GPIO and pins definition """""""""""""""""""""""
+# GPIO and pins definition
 # GPIO general setup
 GPIO.setmode(GPIO.BCM)
 
-#""" order of pins selected according to PCB layout """
-#""" 12 input pins """
-
+# order of pins selected according to PCB layout
 # GPIO pin numbering for RaspberryPi B+
+# 12 input pins
+
 inPin1 = 14
 inPin2 = 15
 inPin3 = 18
@@ -62,23 +58,23 @@ inPin10 = 16
 inPin11 = 20
 inPin12 = 21
 
-#""" 10 output pins """
-outPin1 = 26
-outPin2 = 19
-outPin3 = 13
-outPin4 = 6
-outPin5 = 5
-outPin6 = 11
-outPin7 = 9
-outPin8 = 10
-outPin9 = 22
-outPin10 = 27
-
+# 10 output pins 
+outPin1 =  27
+outPin2 =  22
+outPin3 =  10
+outPin4 =  9
+outPin5 =  11
+outPin6 =  5
+outPin7 =  6
+outPin8 =  13
+outPin9 =  19
+outPin10 = 26
 
  
-#""""""""""""""""""""""" PIN LISTS & MAPS & SORTING FUNCTIONS """""""""""""""""""""""
-def sortKeysLenAlphabet(l):
+# PIN LISTS & MAPS & SORTING FUNCTIONS
+def sortKeys(l):
     return sorted(sorted(l.keys()), key=len)
+
 
 
 inPinList = [inPin1, inPin2, inPin3,
@@ -94,6 +90,8 @@ inPinValues = {'inPin1':0, 'inPin2':0, 'inPin3':0,
                'inPin10':0, 'inPin11':0, 'inPin12':0
 }
 
+#print sortKeys(inPinValues)
+#exit()
 
 outPinList = [outPin1, outPin2, outPin3,
               outPin4, outPin5, outPin6,
@@ -101,96 +99,62 @@ outPinList = [outPin1, outPin2, outPin3,
               outPin10
 ]
 
-
 outPinValues = {'outPin1':0, 'outPin2':0, 'outPin3':0,
                 'outPin4':0, 'outPin5':0, 'outPin6':0,
                 'outPin7':0, 'outPin8':0, 'outPin9':0,
                 'outPin10':0
 }
 
+# general GPIO pin setup
 for num in inPinList:
     print "setting pin " + str(num) + " as INPUT"
     GPIO.setup(num,GPIO.IN)
     time.sleep(0.2)
 
-
+# default value for output is False = 0V 
 for num in outPinList:
     print "setting pin " + str(num) + " as OUTPUT"
     GPIO.setup(num,GPIO.OUT)
+    GPIO.output(num,False)
     time.sleep(0.2)
-
-#while True:
-for i in range(20):
-    for num in outPinList:
-        print "test " + str(num)
-        GPIO.output(num,True)
-        time.sleep(10)
-        GPIO.output(num,False)
-        time.sleep(10)
-
-
-#time.sleep(100)
-
-#print "testing complete"
-#
-#GPIO.cleanup()
-#exit()
-
-#time.sleep(1)
-
-#for x in 
-
-#while True:
-#    for x in outPinList:
         
-
-
-#""""""""""""""""""""""" ACCUMULATION OF ACTIVE PINS """"""""""""""""""""""
+# ACCUMULATION OF ACTIVE PINS 
 inPinAccum = {'inPin1':0, 'inPin2':0, 'inPin3':0,
               'inPin4':0, 'inPin5':0, 'inPin6':0,
               'inPin7':0, 'inPin8':0, 'inPin9':0,
               'inPin10':0, 'inPin11':0, 'inPin12':0
 }
 
-accumStep = 1;
-accumMax = 255 # basically a time value needed for detector to be acceped focused one
-readPeriod = 0.04
-dimmThreshold = 100 # value of time needed for diimmer to start dimm
 
-
-#""""""""""""""""""""""" APP VARS AND LOGIC HLEPERS """""""""""""""""""""""
-#""" helper selected vars  """
+# APP VARS AND LOGIC HLEPERS
+# helper selected vars  
 selectedInput = 0
 selectedOutput = 0
 selectedSong = 0
 
-#""" general program states"""
+accumStep = 1 # rise and fall speed of accumulated value
+accumMax = 40 # basically a time value needed for detector to be acceped as focused
+
+readPeriod = 0.04 
+
+# general program states
 programStates = ["reading", "playing", "dimmingOut", "closing"]
 programState = "reading"
 
-
-#""""""""""""""""""""""" GENERAL FUNCTIONS """""""""""""""""""""""
-#def pickSong (x):
-#    if x >= 0:
-#        song = audioFiles[x]
-#        print "\nplay file: " + song + '\n'
-#        time.sleep(0.5)
-#        os.system('aplay ' + absolutePath + song)
-#        print "\nend of song\n"
-#
-#    if x == -1:
-#        print "\nno track is selected\n"
-
-
+#  GENERAL FUNCTIONS  
+def pickSong (x):    
+    song = audioFiles[x]
+    print "\nplay file: " + song + '\n'
+    time.sleep(0.5)
+    os.system('aplay ' + absolutePath + song)
+    print "\nend of song\n"
 
 def readInPinValues(inList,inDict):
     n = 0
-    keys = sortKeysLenAlphabet(inDict)
+    keys = sortKeys(inDict)
     for k in keys:
         inDict[k] = GPIO.input(inList[n])
-        print "id: " + str(k) + " GPIO: " + str(inList[n]) + " value: " + str(inDict[k])
-        n = n+1
-        
+        n = n+1        
 
 def clamp(x,minim,maxim):
     if x < minim:
@@ -204,7 +168,7 @@ def clamp(x,minim,maxim):
 def accumInPinValues(inDict,accumDict):
     print '\n'
 
-    keys = sortKeysLenAlphabet(inDict)
+    keys = sortKeys(inDict)
     for k in keys:
         ad = accumDict[k]
         if inDict[k] == 1:
@@ -218,23 +182,18 @@ def accumInPinValues(inDict,accumDict):
 
 def orderOfFocused(accumDict):
     n = 0
-    keys = sortKeysLenAlphabet(accumDict)    
+    order = -1
+    keys = sortKeys(accumDict)    
     for k in keys:
         ad = accumDict[k]
-        # if one of detectors reach maximum value
-        # return its order number
-        # otherwise returns -1
-        if ad == 255:
-            return n        
-        else:
-            return -1
-        # rise the order number
+        if(ad>accumMax):
+            order = n
         n=n+1
-    
+    return order
 
 def whichSong (vals):
     n = 0
-    keys = sortKeysLenAlphabet(vals)
+    keys = sortKeys(vals)
     for k in keys:
         if vals[k] == 0:
             n=n+1
@@ -244,18 +203,54 @@ def whichSong (vals):
         n = -1
     return n
 
-def dimm(accum,out):
+def clearAccumMap(accum):
+    for k in accum.keys():
+        accum[k] = 0
+
+def blinkSequence(l, on, off, t):
+    for i in range(t):
+        for x in l:
+            print "testig pin: " + str(x)
+            GPIO.output(x,True)
+            time.sleep(on)
+            GPIO.output(x,False)
+            time.sleep(off)
+
+def setOutPinsOn(l):
+    for x in l:
+        GPIO.output(x,True)
+
+def setOutPinsOff(l):
+    for x in l:
+        GPIO.output(x,False)
+
+
+def testTaktovka(out,vals):
     n = 0
-    keys = sortKeysLenAlphabet(accum)
-    for k in keys:
-        out[k] = 0
-        if accum[k] > dimmThreshold:
-            out[k] = 1
+    keys = sortKeys(vals)
+    # helper var for triple receiver stand
+    triada = False
+    for key in keys:
+        # normal stands with just one receiver
+        if n < len(out)-1:
+            #write results from receivers to lights
+            GPIO.output(out[n],vals[key])
+        # stand with three receivers
+        else:
+            if(vals[key]==1):
+                triada = True
+        n = n+1
+    # write light output to triple receiver light
+    GPIO.output(out[8],triada)
+
+def setLight(accum):
+    
+    
 
             
 #def changeSelectedSong(x, inDict):
 #    n = 0
-#    keys = sortKeysLenAlphabet(inDict)
+#    keys = sortKeys(inDict)
     # for k in keys:
     #     if n == x:
     #         inDict[k]=1
@@ -265,15 +260,19 @@ def dimm(accum,out):
 
 
 
-#""""""""""""""""""""""" MAIN LOOP """""""""""""""""""""""
+# MAIN LOOP 
 
 while programState!="closing":
 
     if programState == "reading":
         readInPinValues(inPinList,inPinValues)
-#        accumInPinValues(inPinValues,inPinAccum)
-#        dimm(inPinAccum,ouPinValues)
-#        print "\n focused stand order: " + str(orderOfFocused(inPinAccum))
+        testTaktovka(outPinList,inPinValues)
+        accumInPinValues(inPinValues,inPinAccum)
+        foc = orderOfFocused(inPinAccum) 
+        print "order of focused: " + str(foc)
+        if foc != -1:
+            programState = "playing"
+            selectedTrack = foc
         time.sleep(readPeriod)
 #        off = orderOfFocused(inPinAccum)
 #        if off != -1:
@@ -282,12 +281,13 @@ while programState!="closing":
             
 
     if programState == "playing":
-        pickSong(whichSong(inPinValues))
+        pickSong(selectedSong)
         time.sleep(1)
         programState = "dimmingOut"
 
     if programState == "dimmingOut":
-        time.sleep(1)
+        setOutPinsOff(outPinList)
+        time.sleep(3)
         programState="reading"
 
 
