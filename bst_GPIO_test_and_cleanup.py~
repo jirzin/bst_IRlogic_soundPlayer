@@ -1,7 +1,3 @@
-##############################################
-# TESTING PROGRAM FOR RASPBERRY pi GPIO PINS #
-##############################################
-
 import time
 import RPi.GPIO as GPIO
 
@@ -47,22 +43,16 @@ outPinList = [outPin1, outPin2, outPin3,
 ]
 
 
-##################
-# GPIO PIN SETUP #
-##################
-
+# PIN SETUP
 for num in inPinList:
     GPIO.setup(num,GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
     time.sleep(0.1)
+
 
 for num in outPinList:
     GPIO.setup(num,GPIO.OUT)
     GPIO.output(num,False)
     time.sleep(0.1)
-
-#####################
-# TESTING FUNCTIONS #
-#####################
 
 def blinkSequence(l, on, off, t):
     for i in range(t):
@@ -73,7 +63,6 @@ def blinkSequence(l, on, off, t):
             GPIO.output(x,False)
             time.sleep(off)
 
-
 def setOutPinsOn(l):
     for x in l:
         GPIO.output(x,True)
@@ -82,12 +71,9 @@ def setOutPinsOff(l):
     for x in l:
         GPIO.output(x,False)
 
-#######################################
-# HERE IS PLACE FOR TESTING FUNCTIONS #
-#######################################
+
+
 blinkSequence([outPinList[9]],5,5,200)
 
-
-# CLEANING
 GPIO.cleanup()
 exit()
