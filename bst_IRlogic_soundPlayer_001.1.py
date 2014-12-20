@@ -108,7 +108,7 @@ outPinValues = {'outPin1':0, 'outPin2':0, 'outPin3':0,
 # general GPIO pin setup
 for num in inPinList:
     print "setting pin " + str(num) + " as INPUT"
-    GPIO.setup(num,GPIO.IN)
+    GPIO.setup(num,GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
     time.sleep(0.2)
 
 # default value for output is False = 0V 
@@ -243,7 +243,7 @@ def testTaktovka(out,vals):
     # write light output to triple receiver light
     GPIO.output(out[8],triada)
 
-def setLight(accum):
+#def setLight(accum):
     
     
 
@@ -281,6 +281,7 @@ while programState!="closing":
             
 
     if programState == "playing":
+        clearAccumMap(inPinAccum)
         pickSong(selectedSong)
         time.sleep(1)
         programState = "dimmingOut"
