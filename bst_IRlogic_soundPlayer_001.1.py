@@ -29,7 +29,7 @@ path = "/home/pi/bst_sounds/"
 absolutePath = '/home/pi/bst_sounds/'
 
 audioFiles = [f for f in os.listdir(absolutePath) if os.path.isfile(os.path.join(absolutePath,f))]
-audioFiles = sorted(sorted(audioFiles),key=len)
+audioFiles = sorted(audioFiles)
 
 if(debug):
     print audioFiles
@@ -213,7 +213,7 @@ def testTaktovka(out,vals):
                 triada = True
         n = n+1
     # write light output to triple receiver light
-    GPIO.output(out[8],triada)
+    GPIO.output(out[9],triada)
 
 
 ##############
@@ -232,11 +232,6 @@ while programState!="closing":
             programState = "playing"
             selectedSong = foc
         time.sleep(readPeriod)
-#        off = orderOfFocused(inPinAccum)
-#        if off != -1:
-#            selectedSong = off
-#            programState = "playing"
-            
 
     if programState == "playing":
         clearAccumMap(inPinAccum)
