@@ -12,6 +12,8 @@ import os
 import random # just for testing purpouses
 import time
 import RPi.GPIO as GPIO
+import subprocess
+
 debug = True
 
 if(debug):
@@ -34,6 +36,12 @@ audioFiles = sorted(audioFiles)
 if(debug):
     print audioFiles
     #exit()
+
+global player
+
+blackhole = open('/dev/null','w')
+playerVolume = 1
+playerVolumeStep = 0.1
 
 ############################
 # GPIO SETUP MAPS AND VARS #
@@ -122,25 +130,33 @@ inPinAccum = {'inPin1':0, 'inPin2':0, 'inPin3':0,
 ############################
 # GENERAL PROGRM VARIABLES #
 ############################
-selectedSong = 0
+
+selectedSong = -1
+soundIsPlaying = False
+focusedStand = -1
+selectedStand = -1
+
 
 accumStep = 1 # rise and fall speed of accumulated value
 accumMax = 40 # basically a time value needed for detector to be acceped as focused
 readPeriod = 0.04 
 
-programStates = ["reading", "playing", "dimmingOut", "closing"]
-programState = "reading"
+#programStates = ["reading", "playing", "dimmingOut", "closing"]
+programState = "running"
 
 
-#############################################
-# GENERAL FUNCTIONS AND METHODS DEFINITIONS #
-#############################################
+#####################################
+#   GENERAL FUNCTIONS DEFINITIONS   #
+#####################################
+
 def pickSong (x):    
-    song = audioFiles[x]
-    print "\nplay file: " + song + '\n'
-    time.sleep(0.5)
-    os.system('aplay ' + absolutePath + song)
-    print "\nend of song\n"
+    song = absolutePath + audioFiles[x]
+    return song
+#    print "\nplay file: " + song + '\n'
+#    time.sleep(0.5)
+#    os.system('aplay ' + absolutePath + song)
+#    print "\nend of song\n"
+
 
 def readInPinValues(inList,inDict):
     n = 0
@@ -169,7 +185,7 @@ def accumInPinValues(inDict,accumDict):
             ad = clamp(ad-accumStep,0,255)
         # write accumulation to dictionary
         accumDict[k] = ad
-        print "id: " + str(k) + " accum: " + str(accumDict[k])
+        # print "id: " + str(k) + " accum: " + str(accumDict[k])
 
 def orderOfFocused(accumDict):
     n = 0
@@ -177,7 +193,7 @@ def orderOfFocused(accumDict):
     keys = sortKeys(accumDict)    
     for k in keys:
         ad = accumDict[k]
-        if(ad>accumMax):
+        if ad > accumMax:
             order = n
         n=n+1
     return order
@@ -195,7 +211,28 @@ def blinkSequence(l, on, off, t):
             GPIO.output(x,False)
             time.sleep(off)
 
-def testTaktovka(out,vals):
+def lightManager(inList,outList,playing):
+    n = 0
+    inKeys = sortKeys(inList)
+    outKeys = sortKeys(outList)
+    for inkey in inKeys:
+        if n < 9:
+            outkey = outKeys[n]
+        else:
+            outke = outKeys[9]
+
+        if playing != n:
+            outList[outkey] = inList[inkey]
+        else:
+            outList[outkey] = 1
+
+        print "light for stand " + str(n) + ": " + str(outList[outkey])
+
+        n = n + 1
+
+    print "actually selected stand: " + str(playing) 
+
+def writeToGPIO(out,vals):
     n = 0
     keys = sortKeys(vals)
     # helper var for triple receiver case
@@ -216,33 +253,93 @@ def testTaktovka(out,vals):
     GPIO.output(out[9],triada)
 
 
+def soundManager(select):
+
+    global soundIsPlaying
+    global player 
+    global selectedSong
+
+    if select != -1 :
+
+
+        if soundIsPlaying:        
+            #print "sound is playing"
+            if player.poll() is None:
+                print "player is active"    
+                soundIsPlaying = True
+           #     player.communicate('q')
+            else:
+                print "player is not active"
+                soundIsPlaying = False
+
+        else:
+            #if select != selectedSong:
+            selectedSong = select
+            song = pickSong(select)        
+            print "starting mplayer subprocess"
+            player = subprocess.Popen(["mplayer",song],stdin=subprocess.PIPE,stdout=blackhole,stderr=subprocess.PIPE)
+            soundIsPlaying = True
+
+
+
+    else:
+        if soundIsPlaying :        
+            if player.poll() is None:
+                print "player is active"
+                
+            else:
+                print "player is not active"
+                soundIsPlaying = False
+
+
+        
+
 ##############
 # MAIN LOOP  #
 ##############
 
 while programState!="closing":
 
-    if programState == "reading":
-        readInPinValues(inPinList,inPinValues)
-        testTaktovka(outPinList,inPinValues)
-        accumInPinValues(inPinValues,inPinAccum)
-        foc = orderOfFocused(inPinAccum) 
-        print "order of focused: " + str(foc)
-        if foc != -1:
-            programState = "playing"
-            selectedSong = foc
-        time.sleep(readPeriod)
+#    if programState == "reading":
 
-    if programState == "playing":
-        clearAccumMap(inPinAccum)
-        pickSong(selectedSong)
-        time.sleep(1)
-        programState = "dimmingOut"
+    readInPinValues(inPinList,inPinValues)
+    accumInPinValues(inPinValues,inPinAccum)
+    focusedStand = orderOfFocused(inPinAccum)
+    
+    if focusedStand > -1 : 
+        if selectedStand != focusedStand :
+            selectedStand = focusedStand
+    else:
+        if soundIsPlaying:
+            selectedStand = selectedStand
+        else:
+            selectedStand = -1
+            
+    lightManager(inPinValues,outPinValues,selectedStand)
 
-    if programState == "dimmingOut":
-        setOutPinsOff(outPinList)
-        time.sleep(3)
-        programState="reading"
+    soundManager(selectedStand)
+            
+    time.sleep(readPeriod)
+
+        # testTaktovka(outPinList,inPinValues)
+        # accumInPinValues(inPinValues,inPinAccum)
+        # foc = orderOfFocused(inPinAccum) 
+        # print "order of focused: " + str(foc)
+        # if foc != -1:
+        #     programState = "playing"
+        #     selectedSong = foc
+        # time.sleep(readPeriod)
+
+    # if programState == "playing":
+    #     clearAccumMap(inPinAccum)
+    #     pickSong(selectedSong)
+    #     time.sleep(1)
+    #     programState = "dimmingOut"
+
+    # if programState == "dimmingOut":
+    #     setOutPinsOff(outPinList)
+    #     time.sleep(3)
+    #     programState="reading"
 
 
 
