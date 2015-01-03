@@ -12,7 +12,7 @@ import os
 import random # just for testing purpouses
 import time
 import RPi.GPIO as GPIO
-import subprocess
+import mpylayer
 
 debug = True
 
@@ -27,6 +27,10 @@ if(debug):
 def sortListLenAlphabet(l):
     return sorted(sorted(l, key=len))
 
+global path
+global absolutePath
+global audioFiles
+
 path = "/home/pi/bst_sounds/"
 absolutePath = '/home/pi/bst_sounds/'
 
@@ -37,11 +41,21 @@ if(debug):
     print audioFiles
     #exit()
 
-global player
-player = MPlayerControl()
+global player             # mplayer instance by mpylayer module
+global playerVolume       # volume of player
+global playerVolumeStep   # single volume step smaller = longer but smoother
+global playerPos          # player position in percentage if file is complete it is None
+global checkInterval      # interval for reading the percentage of position from player instance
+global psteps             # stepper for check interval counting
+global switching          # true if switching between stands
 
+player = mpylayer.MPlayerControl()
 playerVolume = 100
-playerVolumeStep = 1
+playerVolumeStep = 5
+playerPos = None
+checkInterval = 30
+psteps = 0
+switching = False
 
 ############################
 # GPIO SETUP MAPS AND VARS #
@@ -113,19 +127,23 @@ outPinValues = {'outPin1':0, 'outPin2':0, 'outPin3':0,
 for num in inPinList:
     print "setting pin " + str(num) + " as INPUT"
     GPIO.setup(num,GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-    time.sleep(0.2)
+    time.sleep(0.02)
+
+time.sleep(0.5)
 
 for num in outPinList:
     print "setting pin " + str(num) + " as OUTPUT"
     GPIO.setup(num,GPIO.OUT)
     GPIO.output(num,False)
-    time.sleep(0.2)
+    time.sleep(0.02)
 
 inPinAccum = {'inPin1':0, 'inPin2':0, 'inPin3':0,
               'inPin4':0, 'inPin5':0, 'inPin6':0,
               'inPin7':0, 'inPin8':0, 'inPin9':0,
               'inPin10':0, 'inPin11':0, 'inPin12':0
 }
+
+time.sleep(0.5)
 
 ############################
 # GENERAL PROGRM VARIABLES #
@@ -143,7 +161,7 @@ selectedSong = -1
 soundIsPlaying = False
 focusedStand = -1
 selectedStand = -1
-accumStep = 1
+accumStep = 2
 accumMax = 40
 readPeriod = 0.04
 
@@ -211,80 +229,94 @@ def lightManager(inList,outList,playing):
     n = 0
     inKeys = sortKeys(inList)
     outKeys = sortKeys(outList)
+    triada = 0
     for inkey in inKeys:
+
         if n < 9:
             outkey = outKeys[n]
+            if playing != n:
+                outList[outkey] = inList[inkey]
+            else:
+                outList[outkey] = 1
+
         else:
-            outke = outKeys[9]
-
-        if playing != n:
-            outList[outkey] = inList[inkey]
-        else:
-            outList[outkey] = 1
-
-        print "light for stand " + str(n) + ": " + str(outList[outkey])
-
+            outkey = outKeys[9]
+            if inList[inkey]!=0:
+                triada = 1
+            if playing == n:
+                triada = 1
+        
+        if n < 9:
+            print "light for stand " + str(n) + ": " + str(outList[outkey])
+            
         n = n + 1
 
+    outList[outKeys[9]]=triada
+    print "light for stand 9: "+str(triada)
     print "actually selected stand: " + str(playing)
 
 def writeToGPIO(out,vals):
     n = 0
     keys = sortKeys(vals)
-    # helper var for triple receiver case
-    triada = False
     for key in keys:
-        # normal stands with just one receiver
-        if n < len(out)-1:
-            #write results from receivers to lights
-            GPIO.output(out[n],vals[key])
-        # stand with three receivers
-        else:
-            # if any of three receivers detect signal
-            # light on GPIO pin will be switched on
-            if(vals[key]==1):
-                triada = True
-        n = n+1
-    # write light output to triple receiver light
-    GPIO.output(out[9],triada)
+        GPIO.output(out[n],vals[key])
+        n+=1
 
 
-def soundManager(select):
+def soundManager(select,focus):
 
     global soundIsPlaying
     global player
     global selectedSong
+    global volume
+    global switching
 
     if select != -1 :
+
         if soundIsPlaying:
-            #print "sound is playing"
-            if player.poll() is None:
-                print "player is active"
-                soundIsPlaying = True
-           #     player.communicate('q')
-            else:
-                print "player is not active"
-                soundIsPlaying = False
+            # print "sound is playing and stand is selected"
+            if selectedSong != select:
+
+                switching = True
+                volume -= playerVolumeStep
+                player.volume = volume
+                if volume <= 0:
+                    selectedSong = select
+                    song = pickSong(select)
+                    player.loadfile(song)
+                    volume = 100
+                    player.volume = volume                    
+                    time.sleep(0.05)
+#                    switching = False
+                    psteps = 1
+                    #playerPos = 0
+
+            #else:
+            #    switching = False
 
         else:
-            #if select != selectedSong:
             selectedSong = select
             song = pickSong(select)
-            print "starting mplayer subprocess"
+            # print "starting mplayer subprocess"
+            volume = 100
             player.loadfile(song)
-            player.volume = 100
+            player.volume = volume
             soundIsPlaying = True
-
-    else:
-        if soundIsPlaying :
-            if player.poll() is None:
-                print "player is active"
-
-            else:
-                print "player is not active"
-                soundIsPlaying = False
+            psteps = 1
 
 
+
+def incmod(x,i,m):
+    
+    r = x+i
+    
+    if r < 0:
+        r = m
+    
+    if r > m:
+        r = 0
+    
+    return r
 
 ##############
 # MAIN LOOP  #
@@ -292,7 +324,18 @@ def soundManager(select):
 
 while True:
 
-    # if programState == "reading":
+    
+    psteps = incmod(psteps,1,checkInterval)
+
+    if psteps == 0:
+        playerPos = player.percent_pos
+
+        if playerPos == None:
+            if switching == False:
+                soundIsPlaying = False
+        else:
+            switching = False
+
 
     readInPinValues(inPinList,inPinValues)
     accumInPinValues(inPinValues,inPinAccum)
@@ -308,9 +351,10 @@ while True:
             selectedStand = -1
 
     lightManager(inPinValues,outPinValues,selectedStand)
+    writeToGPIO(outPinList,outPinValues)
 
-    soundManager(selectedStand)
-
+    soundManager(selectedStand,focusedStand)
+    print "position of player: "+str(playerPos)
     time.sleep(readPeriod)
 
 
