@@ -38,10 +38,10 @@ if(debug):
     #exit()
 
 global player
+player = MPlayerControl()
 
-blackhole = open('/dev/null','w')
-playerVolume = 1
-playerVolumeStep = 0.1
+playerVolume = 100
+playerVolumeStep = 1
 
 ############################
 # GPIO SETUP MAPS AND VARS #
@@ -120,7 +120,7 @@ for num in outPinList:
     GPIO.setup(num,GPIO.OUT)
     GPIO.output(num,False)
     time.sleep(0.2)
-        
+
 inPinAccum = {'inPin1':0, 'inPin2':0, 'inPin3':0,
               'inPin4':0, 'inPin5':0, 'inPin6':0,
               'inPin7':0, 'inPin8':0, 'inPin9':0,
@@ -131,39 +131,36 @@ inPinAccum = {'inPin1':0, 'inPin2':0, 'inPin3':0,
 # GENERAL PROGRM VARIABLES #
 ############################
 
+global selectedSong    # actually playing song
+global soundIsPlaying  # reflect if sound is playing
+global focusedStand    # actualy and temporalily focused stand
+global selectedStand   # selected stand reflects actuall selected music
+global accumStep       # speed of rise and fall slope
+global accumMax        # maximal value of accumulation fro IR senzors
+global readPeriod      # speed of reading GPIO pins
+
 selectedSong = -1
 soundIsPlaying = False
 focusedStand = -1
 selectedStand = -1
-
-
-accumStep = 1 # rise and fall speed of accumulated value
-accumMax = 40 # basically a time value needed for detector to be acceped as focused
-readPeriod = 0.04 
-
-#programStates = ["reading", "playing", "dimmingOut", "closing"]
-programState = "running"
-
+accumStep = 1
+accumMax = 40
+readPeriod = 0.04
 
 #####################################
 #   GENERAL FUNCTIONS DEFINITIONS   #
 #####################################
 
-def pickSong (x):    
+def pickSong (x):
     song = absolutePath + audioFiles[x]
     return song
-#    print "\nplay file: " + song + '\n'
-#    time.sleep(0.5)
-#    os.system('aplay ' + absolutePath + song)
-#    print "\nend of song\n"
-
 
 def readInPinValues(inList,inDict):
     n = 0
     keys = sortKeys(inDict)
     for k in keys:
         inDict[k] = GPIO.input(inList[n])
-        n = n+1        
+        n = n+1
 
 def clamp(x,minim,maxim):
     if x < minim:
@@ -174,8 +171,7 @@ def clamp(x,minim,maxim):
         return x
 
 def accumInPinValues(inDict,accumDict):
-    print '\n'
-
+    #print '\n'
     keys = sortKeys(inDict)
     for k in keys:
         ad = accumDict[k]
@@ -190,7 +186,7 @@ def accumInPinValues(inDict,accumDict):
 def orderOfFocused(accumDict):
     n = 0
     order = -1
-    keys = sortKeys(accumDict)    
+    keys = sortKeys(accumDict)
     for k in keys:
         ad = accumDict[k]
         if ad > accumMax:
@@ -205,7 +201,7 @@ def clearAccumMap(accum):
 def blinkSequence(l, on, off, t):
     for i in range(t):
         for x in l:
-            print "testig pin: " + str(x)
+            #print "testig pin: " + str(x)
             GPIO.output(x,True)
             time.sleep(on)
             GPIO.output(x,False)
@@ -230,7 +226,7 @@ def lightManager(inList,outList,playing):
 
         n = n + 1
 
-    print "actually selected stand: " + str(playing) 
+    print "actually selected stand: " + str(playing)
 
 def writeToGPIO(out,vals):
     n = 0
@@ -256,16 +252,14 @@ def writeToGPIO(out,vals):
 def soundManager(select):
 
     global soundIsPlaying
-    global player 
+    global player
     global selectedSong
 
     if select != -1 :
-
-
-        if soundIsPlaying:        
+        if soundIsPlaying:
             #print "sound is playing"
             if player.poll() is None:
-                print "player is active"    
+                print "player is active"
                 soundIsPlaying = True
            #     player.communicate('q')
             else:
@@ -275,38 +269,36 @@ def soundManager(select):
         else:
             #if select != selectedSong:
             selectedSong = select
-            song = pickSong(select)        
+            song = pickSong(select)
             print "starting mplayer subprocess"
-            player = subprocess.Popen(["mplayer",song],stdin=subprocess.PIPE,stdout=blackhole,stderr=subprocess.PIPE)
+            player.loadfile(song)
+            player.volume = 100
             soundIsPlaying = True
 
-
-
     else:
-        if soundIsPlaying :        
+        if soundIsPlaying :
             if player.poll() is None:
                 print "player is active"
-                
+
             else:
                 print "player is not active"
                 soundIsPlaying = False
 
 
-        
 
 ##############
 # MAIN LOOP  #
 ##############
 
-while programState!="closing":
+while True:
 
-#    if programState == "reading":
+    # if programState == "reading":
 
     readInPinValues(inPinList,inPinValues)
     accumInPinValues(inPinValues,inPinAccum)
     focusedStand = orderOfFocused(inPinAccum)
-    
-    if focusedStand > -1 : 
+
+    if focusedStand > -1 :
         if selectedStand != focusedStand :
             selectedStand = focusedStand
     else:
@@ -314,32 +306,13 @@ while programState!="closing":
             selectedStand = selectedStand
         else:
             selectedStand = -1
-            
+
     lightManager(inPinValues,outPinValues,selectedStand)
 
     soundManager(selectedStand)
-            
+
     time.sleep(readPeriod)
 
-        # testTaktovka(outPinList,inPinValues)
-        # accumInPinValues(inPinValues,inPinAccum)
-        # foc = orderOfFocused(inPinAccum) 
-        # print "order of focused: " + str(foc)
-        # if foc != -1:
-        #     programState = "playing"
-        #     selectedSong = foc
-        # time.sleep(readPeriod)
-
-    # if programState == "playing":
-    #     clearAccumMap(inPinAccum)
-    #     pickSong(selectedSong)
-    #     time.sleep(1)
-    #     programState = "dimmingOut"
-
-    # if programState == "dimmingOut":
-    #     setOutPinsOff(outPinList)
-    #     time.sleep(3)
-    #     programState="reading"
 
 
 
